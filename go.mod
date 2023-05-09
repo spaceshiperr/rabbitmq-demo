@@ -3,6 +3,7 @@ module github.com/spaceshiperr/rabbitmq-demo
 go 1.20
 
 require (
+	github.com/rabbitmq/amqp091-go v1.8.1
 	github.com/rs/zerolog v1.29.1
 	github.com/streadway/amqp v1.0.0
 )
