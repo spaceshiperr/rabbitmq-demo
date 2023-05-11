@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -24,8 +25,8 @@ func main() {
 	defer ch.Close()
 
 	if err := ch.ExchangeDeclare(
-		"logs",
-		"fanout",
+		"logs_direct",
+		"direct",
 		true,
 		false,
 		false,
@@ -47,15 +48,34 @@ func main() {
 		returnErr(err, "Failed to declare a queue")
 	}
 
-	if err := ch.QueueBind(
-		q.Name,
-		"",
-		"logs",
-		false,
-		nil,
-	); err != nil {
-		returnErr(err, "Failed to queue bind")
+	if len(os.Args) < 2 {
+		log.Printf("Usage: %s [info] [warning] [error]", os.Args[0])
+		os.Exit(0)
 	}
+
+	for _, s := range os.Args[1:] {
+		log.Printf("Binding queue %s to exchange %s with routing key %s",
+			q.Name, "logs_direct", s)
+		if err = ch.QueueBind(
+			q.Name,        // queue name
+			s,             // routing key
+			"logs_direct", // exchange
+			false,
+			nil,
+		); err != nil {
+			returnErr(err, "Failed to bind a queue")
+		}
+	}
+
+	//if err := ch.QueueBind(
+	//	q.Name,
+	//	"",
+	//	"logs",
+	//	false,
+	//	nil,
+	//); err != nil {
+	//	returnErr(err, "Failed to queue bind")
+	//}
 
 	msgs, err := ch.Consume(
 		q.Name,

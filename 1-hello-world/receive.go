@@ -1,8 +1,9 @@
 package main
 
 import (
-	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func returnErr(err error, msg string) {
