@@ -67,16 +67,6 @@ func main() {
 		}
 	}
 
-	//if err := ch.QueueBind(
-	//	q.Name,
-	//	"",
-	//	"logs",
-	//	false,
-	//	nil,
-	//); err != nil {
-	//	returnErr(err, "Failed to queue bind")
-	//}
-
 	msgs, err := ch.Consume(
 		q.Name,
 		"",
