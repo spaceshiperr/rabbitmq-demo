@@ -2,26 +2,24 @@ package main
 
 import (
 	"context"
-	"log"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	log "github.com/rs/zerolog"
 )
 
-func returnErr(err error, msg string) {
-	log.Panicf("%s: %s", msg, err)
-}
-
 func main() {
+	logger := log.Logger{}
+
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		returnErr(err, "Failed to connect to RabbitMQ")
+		logger.Fatal().Msgf("%s: %s", "Failed to connect to RabbitMQ", err.Error())
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		returnErr(err, "Failed to open a channel")
+		logger.Error().Msgf("%s: %s", "Failed to open a channel", err.Error())
 	}
 	defer ch.Close()
 
@@ -34,7 +32,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to declare a queue")
+		logger.Error().Msgf("%s: %s", "Failed to declare a queue", err.Error())
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -51,8 +49,8 @@ func main() {
 			ContentType: "text/plain",
 			Body:        []byte(body),
 		}); err != nil {
-		returnErr(err, "Failed to publish a message")
+		logger.Error().Msgf("%s: %s", "Failed to publish a message", err.Error())
 	}
 
-	log.Printf(" [x] Sent %s\n", body)
+	logger.Info().Msgf(" [x] Sent %s\n", body)
 }

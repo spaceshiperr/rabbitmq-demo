@@ -3,22 +3,24 @@ package main
 import (
 	"fmt"
 
-	"github.com/rs/zerolog/log"
+	log "github.com/rs/zerolog"
 	"github.com/streadway/amqp"
 )
 
 func main() {
+	logger := log.Logger{}
+
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		log.Fatal().Msgf("err: %s", err.Error())
+		logger.Fatal().Msgf("err: %s", err.Error())
 	}
 	defer conn.Close()
 
-	fmt.Println("successfully connected to rabbitmq instance")
+	logger.Info().Msg("successfully connected to rabbitmq instance")
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Error().Msgf("err: %s", err.Error())
+		logger.Error().Msgf("err: %s", err.Error())
 	}
 	defer ch.Close()
 
@@ -31,7 +33,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		log.Error().Msgf("err: %s", err.Error())
+		logger.Error().Msgf("err: %s", err.Error())
 	}
 
 	fmt.Println(q)
@@ -46,8 +48,8 @@ func main() {
 			Body:        []byte("new test message 2"),
 		},
 	); err != nil {
-		log.Error().Msgf("err: %s", err.Error())
+		logger.Error().Msgf("err: %s", err.Error())
 	}
 
-	fmt.Println("successfully published message to rabbitmq")
+	logger.Info().Msg("successfully published message to rabbitmq")
 }

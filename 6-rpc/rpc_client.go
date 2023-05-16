@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"os"
 	"strconv"
@@ -10,10 +9,41 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	log "github.com/rs/zerolog"
 )
 
-func returnErr(err error, msg string) {
-	log.Panicf("%s: %s", msg, err)
+func main() {
+	logger := log.Logger{}
+
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	n := bodyFrom(logger, os.Args)
+
+	logger.Info().Msgf(" [x] Requesting fib(%d)\n", n)
+
+	res, err := fibonacciRPC(logger, n)
+	if err != nil {
+		logger.Error().Msgf("%s: %s", "Failed to handle RPC request", err.Error())
+	}
+
+	logger.Info().Msgf(" [.] Got %d\n", res)
+}
+
+func bodyFrom(logger log.Logger, args []string) int {
+	var s string
+
+	if (len(args) < 2) || os.Args[1] == "" {
+		s = "30"
+	} else {
+		s = strings.Join(args[1:], " ")
+	}
+
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		logger.Error().Msgf("%s: %s", "Failed to convert arg to integer", err.Error())
+	}
+
+	return n
 }
 
 func randomString(l int) string {
@@ -29,16 +59,16 @@ func randInt(min int, max int) int {
 	return min + rand.Intn(max-min)
 }
 
-func fibonacciRPC(n int) (res int, err error) {
+func fibonacciRPC(logger log.Logger, n int) (res int, err error) {
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		returnErr(err, "Failed to connect to RabbitMQ")
+		logger.Fatal().Msgf("%s: %s", "Failed to connect to RabbitMQ")
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		returnErr(err, "Failed to open a channel")
+		logger.Error().Msgf("%s: %s", "Failed to open a channel", err.Error())
 	}
 	defer ch.Close()
 
@@ -51,7 +81,7 @@ func fibonacciRPC(n int) (res int, err error) {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to declare a queue")
+		logger.Error().Msgf("%s: %s", "Failed to declare a queue", err.Error())
 	}
 
 	msgs, err := ch.Consume(
@@ -64,7 +94,7 @@ func fibonacciRPC(n int) (res int, err error) {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to register a consumer")
+		logger.Error().Msgf("%s: %s", "Failed to register a consumer", err.Error())
 	}
 
 	corrId := randomString(32)
@@ -83,50 +113,18 @@ func fibonacciRPC(n int) (res int, err error) {
 			ReplyTo:       q.Name,
 			Body:          []byte(strconv.Itoa(n)),
 		}); err != nil {
-		returnErr(err, "Failed to publish a message")
+		logger.Error().Msgf("%s: %s", "Failed to publish a message", err.Error())
 	}
 
 	for d := range msgs {
 		if corrId == d.CorrelationId {
 			res, err = strconv.Atoi(string(d.Body))
 			if err != nil {
-				returnErr(err, "Failed to convert body to integer")
+				logger.Error().Msgf("%s: %s", "Failed to convert body to integer", err.Error())
 				break
 			}
 		}
 	}
 
 	return
-}
-
-func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	n := bodyFrom(os.Args)
-
-	log.Printf(" [x] Requesting fib(%d)", n)
-
-	res, err := fibonacciRPC(n)
-	if err != nil {
-		returnErr(err, "Failed to handle RPC request")
-	}
-
-	log.Printf(" [.] Got %d", res)
-}
-
-func bodyFrom(args []string) int {
-	var s string
-
-	if (len(args) < 2) || os.Args[1] == "" {
-		s = "30"
-	} else {
-		s = strings.Join(args[1:], " ")
-	}
-
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		returnErr(err, "Failed to convert arg to integer")
-	}
-
-	return n
 }

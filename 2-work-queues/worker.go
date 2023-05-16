@@ -2,26 +2,24 @@ package main
 
 import (
 	"bytes"
-	"log"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	log "github.com/rs/zerolog"
 )
 
-func returnErr(err error, msg string) {
-	log.Panicf("%s: %s", msg, err)
-}
-
 func main() {
+	logger := log.Logger{}
+
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		returnErr(err, "Failed to connect to RabbitMQ")
+		logger.Fatal().Msgf("%s: %s", "Failed to connect to RabbitMQ", err.Error())
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		returnErr(err, "Failed to open a channel")
+		logger.Error().Msgf("%s: %s", "Failed to open a channel", err.Error())
 	}
 	defer ch.Close()
 
@@ -34,11 +32,11 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to declare a queue")
+		logger.Error().Msgf("%s: %s", "Failed to declare a queue", err.Error())
 	}
 
 	if err := ch.Qos(1, 0, false); err != nil {
-		returnErr(err, "Failed to set QoS")
+		logger.Error().Msgf("%s: %s", "Failed to set QoS", err.Error())
 	}
 
 	msgs, err := ch.Consume(
@@ -51,28 +49,28 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to register a consumer")
+		logger.Error().Msgf("%s: %s", "Failed to register a consumer", err.Error())
 	}
 
 	var forever chan struct{}
 
 	go func() {
 		for d := range msgs {
-			log.Printf("Received a message: %s", d.Body)
+			logger.Info().Msgf("Received a message: %s\n", d.Body)
 
 			dotCount := bytes.Count(d.Body, []byte("."))
 
 			t := time.Duration(dotCount)
 			time.Sleep(t * time.Second)
 
-			log.Printf("Done")
+			logger.Info().Msgf("Done\n")
 
 			if err := d.Ack(false); err != nil {
-				returnErr(err, "Failed to acknowledge message consuming")
+				logger.Error().Msgf("%s: %s", "Failed to acknowledge message consuming", err.Error())
 			}
 		}
 	}()
 
-	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+	logger.Info().Msgf(" [*] Waiting for messages. To exit press CTRL+C\n")
 	<-forever
 }

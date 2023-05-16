@@ -2,37 +2,25 @@ package main
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	log "github.com/rs/zerolog"
 )
 
-func returnErr(err error, msg string) {
-	log.Panicf("%s: %s", msg, err)
-}
-
-func fib(n int) int {
-	if n == 0 {
-		return 0
-	} else if n == 1 {
-		return 1
-	} else {
-		return fib(n-1) + fib(n-2)
-	}
-}
-
 func main() {
+	logger := log.Logger{}
+
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		returnErr(err, "Failed to connect to RabbitMQ")
+		logger.Fatal().Msgf("%s: %s", "Failed to connect to RabbitMQ", err.Error())
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		returnErr(err, "Failed to open a channel")
+		logger.Error().Msgf("%s: %s", "Failed to open a channel", err.Error())
 	}
 	defer ch.Close()
 
@@ -45,7 +33,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to declare a queue")
+		logger.Error().Msgf("%s: %s", "Failed to declare a queue", err.Error())
 	}
 
 	if err = ch.Qos(
@@ -53,7 +41,7 @@ func main() {
 		0,
 		false,
 	); err != nil {
-		returnErr(err, "Failed to set QoS")
+		logger.Error().Msgf("%s: %s", "Failed to set QoS", err.Error())
 	}
 
 	msgs, err := ch.Consume(
@@ -66,7 +54,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		returnErr(err, "Failed to register a consumer")
+		logger.Error().Msgf("%s: %s", "Failed to register a consumer")
 	}
 
 	var forever chan struct{}
@@ -78,10 +66,10 @@ func main() {
 		for d := range msgs {
 			n, err := strconv.Atoi(string(d.Body))
 			if err != nil {
-				returnErr(err, "Failed to convert body to integer")
+				logger.Error().Msgf("%s: %s", "Failed to convert body to integer", err.Error())
 			}
 
-			log.Printf(" [.] fib(%d)", n)
+			logger.Info().Msgf(" [.] fib(%d)\n", n)
 			response := fib(n)
 
 			if err = ch.PublishWithContext(ctx,
@@ -94,13 +82,23 @@ func main() {
 					CorrelationId: d.CorrelationId,
 					Body:          []byte(strconv.Itoa(response)),
 				}); err != nil {
-				returnErr(err, "Failed to publish a message")
+				logger.Error().Msgf("%s: %s", "Failed to publish a message")
 			}
 
 			d.Ack(false)
 		}
 	}()
 
-	log.Printf(" [*] Awaiting RPC requests")
+	logger.Info().Msgf(" [*] Awaiting RPC requests\n")
 	<-forever
+}
+
+func fib(n int) int {
+	if n == 0 {
+		return 0
+	} else if n == 1 {
+		return 1
+	} else {
+		return fib(n-1) + fib(n-2)
+	}
 }

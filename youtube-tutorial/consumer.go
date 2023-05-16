@@ -1,23 +1,24 @@
 package main
 
 import (
-	"fmt"
-	"github.com/rs/zerolog/log"
+	log "github.com/rs/zerolog"
 	"github.com/streadway/amqp"
 )
 
 func main() {
-	fmt.Println("consumer app")
+	logger := log.Logger{}
+
+	logger.Info().Msgf("consumer app\n")
 
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		log.Error().Msg(err.Error())
+		logger.Error().Msg(err.Error())
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Error().Msg(err.Error())
+		logger.Error().Msg(err.Error())
 	}
 	defer ch.Close()
 
@@ -31,17 +32,18 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		log.Error().Msg(err.Error())
+		logger.Error().Msg(err.Error())
 	}
 
 	forever := make(chan bool)
 	go func() {
 		for msg := range msgs {
-			fmt.Printf("reciever message: %s\n", msg.Body)
+			logger.Info().Msgf("receiver message: %s\n", msg.Body)
 		}
 	}()
 
-	fmt.Println("successfully connected to rabbitmq instance")
-	fmt.Println("waiting for messages")
+	logger.Info().Msg("successfully connected to rabbitmq instance")
+	logger.Info().Msg("waiting for messages")
+
 	<-forever
 }
